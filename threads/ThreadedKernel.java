@@ -49,7 +49,7 @@ public class ThreadedKernel extends Kernel {
 		//KThread.selfTest();
 		//KThread.InterlockTest();
 		//Condition2.selfTest();
-		Alarm.selftest();
+		Alarm.selfTest();
 		Semaphore.selfTest();
 		SynchList.selfTest();
 		if (Machine.bank() != null) {
