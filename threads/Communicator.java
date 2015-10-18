@@ -40,6 +40,8 @@ public class Communicator {
         lock.acquire();
         //System.out.println("speaking sleeps at: " + Machine.timer().getTime());
         //speak_lock.sleep();
+        while(listenning <= 0)
+            speak_lock.sleep();
         text.add(word);
         //textbuffer = word;
         //System.out.println("text added is: " + text.peek());
@@ -58,6 +60,7 @@ public class Communicator {
         lock.acquire();
         //System.out.println("speaking wakes at: " + Machine.timer().getTime());
         //speak_lock.wake();
+        listenning++;
         int returned = 0;
         while(text.isEmpty())
             listen_lock.sleep();
@@ -87,7 +90,7 @@ public class Communicator {
         public void run() {
             com.speak(4);
             times[0] = Machine.timer().getTime();
-            System.out.println("time0 is: " + times[0]);
+            //System.out.println("time0 is: " + times[0]);
         }
     });
     speaker1.setName("S1");
@@ -95,31 +98,31 @@ public class Communicator {
         public void run() {
             com.speak(7);
             times[1] = Machine.timer().getTime();
-            System.out.println("time1 is: " + times[1]);
+            //System.out.println("time1 is: " + times[1]);
         }
     });
     speaker2.setName("S2");
     KThread listener1 = new KThread( new Runnable () {
         public void run() {
             words[0] = com.listen();
-             System.out.println("words0 is: " + words[0]);
+             //System.out.println("words0 is: " + words[0]);
             times[2] = Machine.timer().getTime();
-            System.out.println("time2 is: " + times[2]);
+            //System.out.println("time2 is: " + times[2]);
         }
     });
     listener1.setName("L1");
     KThread listener2 = new KThread( new Runnable () {
         public void run() {
             words[1] = com.listen();
-           System.out.println("words1 is: " + words[1]);
+          // System.out.println("words1 is: " + words[1]);
             times[3] = Machine.timer().getTime();
-            System.out.println("time3 is: " + times[3]);
+            //System.out.println("time3 is: " + times[3]);
         }
     });
     listener2.setName("L2");
     
-    speaker1.fork(); speaker2.fork(); listener1.fork(); listener2.fork();
-    speaker1.join(); speaker2.join(); listener1.join(); listener2.join();
+    //listener1.fork(); speaker2.fork(); speaker1.fork(); listener2.fork();
+    //speaker1.join(); speaker2.join(); listener1.join(); listener2.join();
     //listener1.fork();
     //listener1.join();
     //speaker1.fork();
