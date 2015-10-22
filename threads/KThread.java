@@ -46,6 +46,7 @@ public class KThread {
 	 * @return the current thread.
 	 */
 	public static KThread currentThread() {
+
 		Lib.assertTrue(currentThread != null);
 		return currentThread;
 	}
@@ -55,6 +56,7 @@ public class KThread {
 	 * create an idle thread as well.
 	 */
 	public KThread() {
+		join_lock = new Semaphore(0);
 		if (currentThread != null) {
 			tcb = new TCB();
 		}
@@ -169,7 +171,7 @@ public class KThread {
 	private void runThread() {
 		begin();
 		target.run();
-		a.V();
+		join_lock.V();
 		finish();
 	}
 
@@ -295,7 +297,7 @@ public class KThread {
 		//	this.yield();
 		//}
 
-		a.P();
+		join_lock.P();
 
 	}
 
@@ -618,6 +620,6 @@ private static class JoinTest implements Runnable
 
 	private static KThread idleThread = null;
 
-	private static Semaphore a = new Semaphore(0);
+	private static Semaphore join_lock;
 
 }

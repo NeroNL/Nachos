@@ -43,8 +43,8 @@ public class Condition2 {
 
 		conditionLock.release();
 		
-		cond = Machine.interrupt().enabled();
-		Machine.interrupt().disable();
+		cond = Machine.interrupt().disable();
+		//Machine.interrupt().disable();
 		waitQueue.waitForAccess(KThread.currentThread());
 		KThread.currentThread().sleep();
 		Machine.interrupt().restore(cond);
@@ -60,8 +60,8 @@ public class Condition2 {
 	public void wake() {
 		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 		//Machine.interrupt().disable();
-		cond = Machine.interrupt().enabled();
-		Machine.interrupt().disable();
+		cond = Machine.interrupt().disable();
+		//Machine.interrupt().disable();
 		KThread thread = waitQueue.nextThread();
 		if (thread != null) {
 			thread.ready();
