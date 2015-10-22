@@ -22,7 +22,7 @@ public class Communicator {
         listenning = 0;
         speaking = 0;
         text = new LinkedList<Integer>();
-        isEmpty = false;
+        isEmpty = new Condition2(lock);
         textbuffer = 0;
 	}
 
@@ -37,26 +37,28 @@ public class Communicator {
 	 * @param word the integer to transfer.
 	 */
 	public void speak(int word) {
-        //System.out.println("speaking sleeps at: " + Machine.timer().getTime());
         text.add(word);
-        //System.out.println("text added is: " + text.peekLast());
+        System.out.println("text added is: " + text.peekLast());
         lock.acquire();
         
-        //speak_lock.sleep();
         speaking++;
 
         listen_lock.wake();
 
-        while(listenning < 1)
+        while(listenning < 1){
             speak_lock.sleep();
+        }
 
-        
-        System.out.println("speak at: " + Machine.timer().getTime());
         listenning--;
+//System.out.println("lock is here: " + textbuffer);
+        if(textbuffer > 0){
+            
+            isEmpty.sleep();
+        }
+        textbuffer--;
+        System.out.println("speak returns at: " + Machine.timer().getTime());
+
         lock.release();
-        //isEmpty = false;
-
-
 	}
 
 	/**
@@ -68,10 +70,8 @@ public class Communicator {
 	public int listen() {
         
         lock.acquire();
-        System.out.println("speaking wakes at: " + Machine.timer().getTime());
-        //speak_lock.wake();
         listenning++;
-
+        textbuffer++;
         speak_lock.wake();
         int returned = 0;
         while(speaking < 1)
@@ -79,14 +79,12 @@ public class Communicator {
 
         speaking--;
 
-        //if(!isEmpty){
+        isEmpty.wake();
 
-        
-          //  isEmpty = true;
-        //}
-
-        returned = text.removeFirst();
+        returned = text.removeLast();
+        System.out.println("text returned is: " + returned);
         lock.release();
+        textbuffer--;
         return returned;
 	}
 
@@ -97,8 +95,8 @@ public class Communicator {
     private int speaking;
     private LinkedList<Integer> text;
     private int textbuffer;
-    private boolean isEmpty;
-    
+    private Condition2 isEmpty;
+    public static int i =0;
     
 
 	public static void selfTest(){
@@ -109,7 +107,9 @@ public class Communicator {
             public void run() {
                 com.speak(4);
                 times[0] = Machine.timer().getTime();
-                
+                System.out.println("time0 is: " + times[0]);
+                i++;
+                //System.out.println("speaker1 i is: " + i);
             }
         });
         speaker1.setName("S1");
@@ -117,53 +117,55 @@ public class Communicator {
             public void run() {
                 com.speak(7);
                 times[1] = Machine.timer().getTime();
-
+                System.out.println("time1 is: " + times[1]);
+                i++;
+                //System.out.println("speaker2 i is: " + i);
+            
             }
         });
         speaker2.setName("S2");
         KThread listener1 = new KThread( new Runnable () {
             public void run() {
-                words[0] = com.listen();   
+                words[0] = com.listen();  
+                System.out.println("words0 is: " + words[0]); 
                 times[2] = Machine.timer().getTime();
-                
+                System.out.println("time2 is: " + times[2]);
+                i++;
+                //System.out.println("listener1 i is: " + i);
+            
             }
         });
         listener1.setName("L1");
         KThread listener2 = new KThread( new Runnable () {
             public void run() {
                 words[1] = com.listen();
+                System.out.println("words1 is: " + words[1]);
                 times[3] = Machine.timer().getTime();
-                
+                System.out.println("time3 is: " + times[3]);
+                i++;
+                 //System.out.println("listener2 i is: " + i);
             }
         });
         listener2.setName("L2");
         
+        
+        listener1.fork(); 
+        
         speaker1.fork(); 
         speaker2.fork(); 
-        listener1.fork(); 
         listener2.fork(); 
         speaker1.join(); 
         speaker2.join(); 
         listener1.join(); 
         listener2.join(); 
-        //speaker3.fork();
-        //speaker3.join();
-       // speaker1.fork();
-        //listener1.fork();
-        
-        //listener1.join();
-        //speaker1.join();
-        System.out.println("time0 is: " + times[0]);
-        times[1] = Machine.timer().getTime();
-        System.out.println("time1 is: " + times[1]);
-        System.out.println("time2 is: " + times[2]);
-        System.out.println("time3 is: " + times[3]);
-        System.out.println("words0 is: " + words[0]);
-        System.out.println("words1 is: " + words[1]);
+        while(i < 4) {
+            
+        }
+        System.out.println("before check: " + Machine.timer().getTime());
         Lib.assertTrue(words[0] == 4, "Didn't listen back spoken word."); 
         Lib.assertTrue(words[1] == 7, "Didn't listen back spoken word.");
         Lib.assertTrue(times[0] > times[2], "speak returned before listen.");
-         System.out.println("before last check: " + Machine.timer().getTime());
+        //System.out.println("before last check: " + Machine.timer().getTime());
         Lib.assertTrue(times[1] > times[3], "speak returned before listen.");
     }
 }
