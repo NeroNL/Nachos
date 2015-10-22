@@ -55,7 +55,6 @@ public class Communicator {
             
             isEmpty.sleep();
         }
-        textbuffer--;
         System.out.println("speak returns at: " + Machine.timer().getTime());
 
         lock.release();
