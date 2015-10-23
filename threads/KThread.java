@@ -171,7 +171,7 @@ public class KThread {
 	private void runThread() {
 		begin();
 		target.run();
-		join_lock.V();
+		//join_lock.V();
 		finish();
 	}
 
@@ -293,11 +293,11 @@ public class KThread {
 			return ;
 		}
 
-		//while(this.status != statusFinished){
-		//	this.yield();
-		//}
+		while(this.status != statusFinished){
+			this.yield();
+		}
 
-		join_lock.P();
+		//join_lock.P();
 
 	}
 
@@ -511,6 +511,8 @@ private static void joinTestCase2()
     thread0.fork();
     thread1.fork();
     thread2.fork();
+    //thread0.join();
+    //thread1.join();
     thread2.join();
 }
 
@@ -525,12 +527,12 @@ private static class JoinTest implements Runnable
         public void run() 
 	{
 		if ( thread != null )
-            		thread.join();
+            thread.join();
 
            	 for (int i = 0; i < 5; i++)
         	{
         		System.out.println("*** thread " + currentThread.getName() + " looped " + i + " times");
-                	currentThread.yield();
+                currentThread.yield();
         	}
         }
 }

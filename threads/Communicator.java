@@ -52,7 +52,6 @@ public class Communicator {
         listenning--;
 //System.out.println("lock is here: " + textbuffer);
         if(textbuffer > 0){
-            
             isEmpty.sleep();
         }
         System.out.println("speak returns at: " + Machine.timer().getTime());
@@ -149,7 +148,6 @@ public class Communicator {
         
         
         listener1.fork(); 
-        
         speaker1.fork(); 
         speaker2.fork(); 
         listener2.fork(); 
@@ -157,9 +155,7 @@ public class Communicator {
         speaker2.join(); 
         listener1.join(); 
         listener2.join(); 
-        while(i < 4) {
-            
-        }
+        //while(i < 4) {}
         System.out.println("before check: " + Machine.timer().getTime());
         Lib.assertTrue(words[0] == 4, "Didn't listen back spoken word."); 
         Lib.assertTrue(words[1] == 7, "Didn't listen back spoken word.");
