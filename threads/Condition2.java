@@ -15,6 +15,7 @@ import java.util.LinkedList;
  */
 public class Condition2 {
 
+	private Lock conditionLock;
 	private static boolean cond;
 	private static int num;
 	private ThreadQueue waitQueue = ThreadedKernel.scheduler
@@ -42,13 +43,13 @@ public class Condition2 {
 		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
 
 		conditionLock.release();
-		
+		num++;
 		cond = Machine.interrupt().disable();
 		//Machine.interrupt().disable();
 		waitQueue.waitForAccess(KThread.currentThread());
 		KThread.currentThread().sleep();
 		Machine.interrupt().restore(cond);
-		num++;
+
 
 		conditionLock.acquire();
 	}
@@ -76,51 +77,63 @@ public class Condition2 {
 	 */
 	public void wakeAll() {
 		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
-		while(num > 0)
+		while(num > 0){
 			wake();
+		}
 	}
-
-	private Lock conditionLock;
 
 	public static void selfTest(){
-	    final Lock lock = new Lock();
-	    //final Condition empty = new Condition(lock);
-	    final Condition2 empty = new Condition2(lock);
-	    final LinkedList<Integer> list = new LinkedList<>();
-	    
-	    KThread consumer = new KThread( new Runnable () {
-	        public void run() {
-	            lock.acquire();
-	            while(list.isEmpty()){
-	                empty.sleep();
-	            }
-	            //System.out.println("break");
-	            Lib.assertTrue(list.size() == 5, "List should have 5 values.");
-	            while(!list.isEmpty()) {
-	                System.out.println("Removed " + list.removeFirst());
-	            }
-	            lock.release();
-	        }
-	    });
-	    
-	    KThread producer = new KThread( new Runnable () {
-	        public void run() {
-	            lock.acquire();
-	            for (int i = 0; i < 5; i++) {
-	                list.add(i);
-	                System.out.println("Added " + i);
-	            }
-	            empty.wake();
-	            lock.release();
-	        }
-	    });
-	    
-	    consumer.setName("Consumer");
-	    producer.setName("Producer");
-	    
-	    consumer.fork();
-	    producer.fork();
-	    consumer.join();
-	    producer.join();
-	}
+    	int[] item = new int[1];
+    	item[0] = 0;
+    	Lock lock = new Lock();
+    	Condition2 con = new Condition2(lock);
+    	KThread producer = new KThread(new Producer(item, lock, con));
+    	KThread consumer1 = new KThread(new Consumer(item, lock, con));
+    	KThread consumer2 = new KThread(new Consumer(item, lock, con));
+    	System.out.println("\n----------------------------------------------\nTEST CONDITION2\n");
+    	consumer1.fork();
+    	consumer2.fork();
+    	producer.fork();
+    	ThreadedKernel.alarm.waitUntil(100000);
+    }
+    
+    private static class Consumer implements Runnable{
+    	private int[] item;
+    	private Lock lock;
+    	private Condition2 sleepingConsumers;
+    	public Consumer(int[] iteM, Lock lock, Condition2 con_var){
+    		item = iteM;
+    		this.lock = lock;
+    		sleepingConsumers = con_var;
+    	}
+    	public void run(){
+    		lock.acquire();
+    		while(item[0] < 1){
+    			System.out.println("Consumer: no item, so I sleep.");
+    			sleepingConsumers.sleep();
+    		}
+    		item[0] -= 1;
+    		System.out.println("Consumer: I use 1 item.");
+    		lock.release();
+    	}
+    }
+    
+    private static class Producer implements Runnable{
+    	private int[] item;
+    	private Lock lock;
+    	private Condition2 sleepingConsumers;
+    	public Producer(int[] iteM, Lock lock, Condition2 con_var){
+    		item = iteM;
+    		this.lock = lock;
+    		sleepingConsumers = con_var;
+    	}
+    	public void run(){
+    		lock.acquire();
+    		item[0] += 1;
+    		System.out.println("Producer: I make one item.");
+    		sleepingConsumers.wakeAll();
+    		lock.release();
+    	}
+    }
+
 }
