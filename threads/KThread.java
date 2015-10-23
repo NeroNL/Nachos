@@ -2,6 +2,7 @@ package nachos.threads;
 
 import nachos.machine.*;
 import nachos.threads.ThreadTests;
+import java.util.*;
 
 /**
  * A KThread is a thread that can be used to execute Nachos kernel code. Nachos
@@ -57,13 +58,14 @@ public class KThread {
 	 */
 	public KThread() {
 		join_lock = new Semaphore(0);
+		//kthreads = new LinkedList<KThread>();
 		if (currentThread != null) {
 			tcb = new TCB();
 		}
 		else {
 			readyQueue = ThreadedKernel.scheduler.newThreadQueue(false);
 			readyQueue.acquire(this);
-
+			joinQueue.acquire(this);
 			currentThread = this;
 			tcb = TCB.currentTCB();
 			name = "main";
@@ -171,7 +173,6 @@ public class KThread {
 	private void runThread() {
 		begin();
 		target.run();
-		//join_lock.V();
 		finish();
 	}
 
@@ -197,7 +198,7 @@ public class KThread {
 	 */
 	public static void finish() {
 		Lib.debug(dbgThread, "Finishing thread: " + currentThread.toString());
-
+		//System.out.println("this thread is: " + currentThread.getName());	
 		Machine.interrupt().disable();
 
 		Machine.autoGrader().finishingCurrentThread();
@@ -205,8 +206,15 @@ public class KThread {
 		Lib.assertTrue(toBeDestroyed == null);
 		toBeDestroyed = currentThread;
 
-		currentThread.status = statusFinished;
+		KThread a = currentThread.joinQueue.nextThread();
+		while(a != null){
+			currentThread.joinQueue.acquire(a);
+			a = currentThread.joinQueue.nextThread();
+		}
+		currentThread.join_lock.V();
+		currentThread.joinQueue = null;
 
+		currentThread.status = statusFinished;
 		sleep();
 	}
 
@@ -293,12 +301,15 @@ public class KThread {
 			return ;
 		}
 
-		while(this.status != statusFinished){
-			this.yield();
-		}
-
-		//join_lock.P();
-
+		//Semaphore a = new Semaphore(0);
+		//while(currentThread.status != statusFinished)
+		//System.out.println("current thread is: " + currentThread.getName());	
+		//System.out.println("this thread is: " + this.getName());
+		//while(this.status != statusFinished)
+		join_lock.P();
+		//join_lock.V();
+		//kthreads.add(this);
+		//a.P();
 	}
 
 	
@@ -603,6 +614,7 @@ private static class JoinTest implements Runnable
 
 	private Runnable target;
 
+
 	private TCB tcb;
 
 	/**
@@ -613,15 +625,13 @@ private static class JoinTest implements Runnable
 
 	/** Number of times the KThread constructor was called. */
 	private static int numCreated = 0;
-
 	private static ThreadQueue readyQueue = null;
-
 	private static KThread currentThread = null;
-
 	private static KThread toBeDestroyed = null;
-
 	private static KThread idleThread = null;
 
-	private static Semaphore join_lock;
+	private ThreadQueue joinQueue = ThreadedKernel.scheduler.newThreadQueue(true);
+	public Semaphore join_lock;
+	//private static LinkedList<KThread> kthreads;
 
 }
