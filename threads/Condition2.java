@@ -103,21 +103,6 @@ public class Condition2 {
 	            lock.release();
 	        }
 	    });
-
-	    KThread consumer1 = new KThread( new Runnable () {
-	        public void run() {
-	            lock.acquire();
-	            while(list.isEmpty()){
-	                empty.sleep();
-	            }
-	            //System.out.println("break");
-	            Lib.assertTrue(list.size() == 5, "List should have 5 values.");
-	            while(!list.isEmpty()) {
-	                System.out.println("Removed " + list.removeFirst());
-	            }
-	            lock.release();
-	        }
-	    });
 	    
 	    KThread producer = new KThread( new Runnable () {
 	        public void run() {
@@ -132,12 +117,10 @@ public class Condition2 {
 	    });
 	    
 	    consumer.setName("Consumer");
-	    consumer1.setName("Consumer1");
 	    producer.setName("Producer");
 
 	    
 	   
-	    consumer1.fork();
 	    consumer.fork();
 	    producer.fork();
 	    consumer.join();
