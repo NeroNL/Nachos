@@ -151,8 +151,12 @@ public class KThread {
 	 * target's <tt>run</tt> method).
 	 */
 	public void fork() {
+		//System.out.println("in fork");
+		//System.out.println("satus is " + status);
 		Lib.assertTrue(status == statusNew);
+		//System.out.println("pass status test");
 		Lib.assertTrue(target != null);
+		//System.out.println("pass target test");
 
 		Lib.debug(dbgThread, "Forking thread: " + toString() + " Runnable: "
 				+ target);
@@ -203,7 +207,9 @@ public class KThread {
 
 		Machine.autoGrader().finishingCurrentThread();
 
+		//System.out.println("assert check");
 		Lib.assertTrue(toBeDestroyed == null);
+		//System.out.println("pass assert check");
 		toBeDestroyed = currentThread;
 
 		KThread a = currentThread.joinQueue.nextThread();

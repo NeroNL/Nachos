@@ -174,9 +174,12 @@ public class CoffSection {
 	public void loadPage(int spn, int ppn) {
 		Lib.assertTrue(file != null);
 
+		//System.out.println("numpages in loadpage is: " + numPages);
 		Lib.assertTrue(spn >= 0 && spn < numPages);
 		Lib.assertTrue(ppn >= 0 && ppn < Machine.processor().getNumPhysPages());
 
+		//System.out.println("spn is: " + spn);
+		//System.out.println("ppn is: " + ppn);
 		int pageSize = Processor.pageSize;
 		byte[] memory = Machine.processor().getMemory();
 		int paddr = ppn * pageSize;

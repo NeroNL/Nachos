@@ -44,6 +44,7 @@ public abstract class OpenFileWithPosition extends OpenFile {
 
 	public int write(byte[] buf, int offset, int length) {
 		int amount = write(position, buf, offset, length);
+		System.out.println("amount is: " + amount);
 		if (amount == -1)
 			return -1;
 

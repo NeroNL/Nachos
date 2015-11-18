@@ -32,6 +32,8 @@ NLIB = libnachos.a
 
 TARGETS = halt sh matmult sort echo cat cp mv rm #chat chatserver
 
+TARGETS = write sh matmult sort echo cat cp mv rm #chat chatserver
+
 .SECONDARY: $(patsubst %.c,%.o,$(wildcard *.c))
 
 all: $(patsubst %,%.coff,$(TARGETS))

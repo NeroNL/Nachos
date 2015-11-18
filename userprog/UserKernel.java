@@ -3,6 +3,7 @@ package nachos.userprog;
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
+import java.util.*;
 
 /**
  * A kernel that can support multiple user processes.
@@ -29,6 +30,13 @@ public class UserKernel extends ThreadedKernel {
 				exceptionHandler();
 			}
 		});
+
+		freePhysicalPages = new LinkedList<Integer>();
+		lock = new Lock();
+		processLock = new Lock();
+
+		for(int i = 0; i < Machine.processor().getNumPhysPages(); i++)
+			freePhysicalPages.add(i);
 	}
 
 	/**
@@ -37,7 +45,7 @@ public class UserKernel extends ThreadedKernel {
 	public void selfTest() {
 		super.selfTest();
 
-		System.out.println("Testing the console device. Typed characters");
+		/*System.out.println("Testing the console device. Typed characters");
 		System.out.println("will be echoed until q is typed.");
 
 		char c;
@@ -47,7 +55,7 @@ public class UserKernel extends ThreadedKernel {
 			console.writeByte(c);
 		} while (c != 'q');
 
-		System.out.println("");
+		System.out.println("");*/
 	}
 
 	/**
@@ -96,6 +104,7 @@ public class UserKernel extends ThreadedKernel {
 		UserProcess process = UserProcess.newUserProcess();
 
 		String shellProgram = Machine.getShellProgramName();
+		System.out.println("shellProgram is: " + shellProgram);
 		Lib.assertTrue(process.execute(shellProgram, new String[] {}));
 
 		KThread.currentThread().finish();
@@ -113,4 +122,10 @@ public class UserKernel extends ThreadedKernel {
 
 	// dummy variables to make javac smarter
 	private static Coff dummy1 = null;
+
+	public static LinkedList<Integer> freePhysicalPages;
+	public static Lock lock;
+	public static Lock processLock;
+	public static int nextProcessID = 0;
+	public static int activeProcess = 0;
 }
