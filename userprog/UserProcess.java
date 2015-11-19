@@ -141,24 +141,17 @@ public class UserProcess {
 
 		byte[] memory = Machine.processor().getMemory();
 
+		if(length <= 0)
+			return 0;
+
 		// for now, just assume that virtual addresses equal physical addresses
 		//if (vaddr < 0 || vaddr >= memory.length)
 		//	return 0;
 		
-		/*int rvaddr = -1;
-		for(int i = 0; i < numPages; i++){
-			if(pageTable[i].vpn == vaddr){
-				rvaddr = i;
-				break;
-			}
-		}
-
-		if(rvaddr == -1)
-			return 0;*/
 		//System.out.println("vaddr in rvm is: " + vaddr);
 		int pageID = Processor.pageFromAddress(vaddr);
 		//System.out.println("pageID in rvm is: " + pageID);
-		if(pageID >= numPages)
+		if(pageID >= numPages || pageID < 0)
 			return 0;
 		TranslationEntry tmp = pageTable[pageID];
 		//System.out.println("ppn in rvm is: " + tmp.ppn);
@@ -167,13 +160,22 @@ public class UserProcess {
 		int pageOffset = Processor.offsetFromAddress(vaddr);
 		int paddr = tmp.ppn*Processor.pageSize + pageOffset; 
 
-		if(paddr < 0 || paddr >= memory.length)
-			return 0;
+		int byteLeft = pageSize - pageOffset;
 
-		int amount = Math.min(length, memory.length - paddr);
-		System.arraycopy(memory, paddr, data, offset, amount);
+		//if(paddr < 0 || paddr >= memory.length)
+		//	return 0;
+
+		int amount = Math.min(byteLeft, length);
+		if(amount == length)
+			System.arraycopy(memory, paddr, data, offset, amount);
+		else{
+			System.arraycopy(memory, paddr, data, offset, amount);
+			readVirtualMemory(vaddr+amount, data, offset+amount, length-amount);
+		}
+
 
 		return amount;
+		
 	}
 
 	/**
@@ -206,12 +208,15 @@ public class UserProcess {
 		Lib.assertTrue(offset >= 0 && length >= 0
 				&& offset + length <= data.length);
 
-		UserKernel.lock.acquire();
+		//UserKernel.lock.acquire();
 		byte[] memory = Machine.processor().getMemory();
 
 		// for now, just assume that virtual addresses equal physical addresses
 		//if (vaddr < 0 || vaddr >= memory.length)
 		//	return 0;
+
+		if(length <= 0)
+			return 0;
 
 		int pageID = Processor.pageFromAddress(vaddr);
 		if(pageID >= numPages)
@@ -224,12 +229,20 @@ public class UserProcess {
 		int pageOffset = Processor.offsetFromAddress(vaddr);
 		int paddr = tmp.ppn*Processor.pageSize + pageOffset;
 
-		if(paddr < 0 || paddr >= memory.length)
-			return 0;
+		//if(paddr < 0 || paddr >= memory.length)
+		//	return 0;
 
-		int amount = Math.min(length, memory.length - paddr);
-		System.arraycopy(data, offset, memory, paddr, amount);
-		UserKernel.lock.release();
+		int byteLeft = pageSize - pageOffset;
+
+		int amount = Math.min(length, byteLeft);
+		//System.out.println("length is: " + length);
+		if(amount == length)
+			System.arraycopy(data, offset, memory, paddr, amount);
+		else{
+			System.arraycopy(data, offset, memory, paddr, amount);
+			writeVirtualMemory(vaddr+amount, data, offset+amount, length-amount);
+		}
+		//UserKernel.lock.release();
 
 		return amount;
 	}
@@ -351,7 +364,7 @@ public class UserProcess {
 		}
 		pageTable = new TranslationEntry[numPages];
 		for(int i = 0; i < numPages; i++){
-			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);
+			pageTable[i] = new TranslationEntry(i, UserKernel.freePhysicalPages.removeLast(), true, false, false, false);
 		}
 
 		
@@ -368,7 +381,7 @@ public class UserProcess {
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
 				
-				UserKernel.lock.acquire();
+				/*UserKernel.lock.acquire();
 				for(int j = 0; j < numPages; j++){
 					if(!pageTable[j].used){
 						//System.out.println("vpn is: " + vpn);
@@ -377,11 +390,14 @@ public class UserProcess {
 						pageTable[j].used = true;
 						pageTable[j].ppn = UserKernel.freePhysicalPages.removeLast();
 						//System.out.println("ppn is: " + pageTable[j].ppn);
-						section.loadPage(i, pageTable[j].ppn);
+						
 						break;
 					}
 				}
-				UserKernel.lock.release();
+				UserKernel.lock.release();*/
+				pageTable[vpn].used = true;
+				pageTable[vpn].readOnly = section.isReadOnly();
+				section.loadPage(i, pageTable[vpn].ppn);
 			}
 		}
 
@@ -573,9 +589,9 @@ public class UserProcess {
 			}
 		}
 
-		for(int i = 0; i < childProcess.size(); i++){
+		/*for(int i = 0; i < childProcess.size(); i++){
 			childProcess.get(i).parentProcess = null;
-		}
+		}*/
 
 		if(parentProcess != null)
 			parentProcess.childProcess.remove(this);
@@ -583,7 +599,11 @@ public class UserProcess {
 		unloadSections();
 		UserKernel.activeProcess--;
 		//System.out.println("activeProcess is: " + UserKernel.activeProcess);
-		
+
+		status = 0;
+		this.status = 0;
+		//UserKernel.processLock.release();
+		good = true;
 		if(UserKernel.activeProcess == 0){
 			//System.out.println("exit kernel");
 			UserKernel.kernel.terminate();
@@ -593,9 +613,6 @@ public class UserProcess {
 			cT.finish();
 		}
 
-		status = 0;
-		this.status = 0;
-		good = true;
 
 	}
 
@@ -603,8 +620,12 @@ public class UserProcess {
 		UserProcess child = null;
 
 		for(int i = 0; i < childProcess.size(); i++){
+			System.out.println("child processID is: " + childProcess.get(i).processID);
 			if(childProcess.get(i).processID == processID){
+				System.out.println("processID is: " + processID);
 				child = childProcess.get(i);
+				//while(child.status != 0) {;}
+				//UserKernel.processLock.acquire();
 				childProcess.remove(i);
 				break;
 			}
@@ -612,7 +633,9 @@ public class UserProcess {
 
 		if(child == null || child.cT == null)
 			return -1;
+		UserKernel.processLock.acquire();
 		child.cT.join();
+		UserKernel.processLock.release();
 		if(child.good != true)
 			return 0;
 
@@ -627,7 +650,7 @@ public class UserProcess {
 
 		String fileName = readVirtualMemoryString(localFile, maxStringLength);
 
-		System.out.println("fileName: " + fileName);	
+		//System.out.println("fileName: " + fileName);	
 
 		if(!fileName.contains(".coff"))
 			return -1;
@@ -646,11 +669,12 @@ public class UserProcess {
 		UserProcess tmp = newUserProcess();
 
 		UserKernel.processLock.acquire();
-		int childProcessID = UserKernel.nextProcessID++;
+		int childProcessID = tmp.processID;
 		UserKernel.processLock.release();
 		//System.out.println("childProcessID is: " + childProcessID);
 
 		tmp.parentProcess = this;
+		childProcess.add(tmp);
 
 		if(tmp.execute(fileName, args)){
 			//System.out.println("successfully exit exec");
