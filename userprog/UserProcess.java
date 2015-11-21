@@ -24,11 +24,8 @@ public class UserProcess {
 	 * Allocate a new process.
 	 */
 	public UserProcess() {
-		/*int numPhysPages = Machine.processor().getNumPhysPages();
-		pageTable = new TranslationEntry[numPhysPages];
-		for (int i = 0; i < numPhysPages; i++)
-			pageTable[i] = new TranslationEntry(i, i, true, false, false, false);*/
 		UserKernel.lock.acquire();
+		UserKernel.activeProcess++;
 		processID = UserKernel.nextProcessID++;
 		UserKernel.lock.release();
 		files[openCount++] = UserKernel.console.openForReading();
@@ -59,7 +56,6 @@ public class UserProcess {
 		if (!load(name, args))
 			return false;
 
-		UserKernel.activeProcess++;
 		cT = new UThread(this).setName(name);
 		cT.fork();
 
@@ -162,19 +158,26 @@ public class UserProcess {
 
 		int byteLeft = pageSize - pageOffset;
 
+		//System.out.println("length is: " + length);
+		//System.out.println("pageSize is: " + pageSize);
+		//System.out.println("byteLeft is: " + byteLeft);
+
 		//if(paddr < 0 || paddr >= memory.length)
 		//	return 0;
 
 		int amount = Math.min(byteLeft, length);
-		if(amount == length)
+		totalReadAmount += amount;
+		if(amount == length){
 			System.arraycopy(memory, paddr, data, offset, amount);
+			return totalReadAmount;
+		}
 		else{
 			System.arraycopy(memory, paddr, data, offset, amount);
 			readVirtualMemory(vaddr+amount, data, offset+amount, length-amount);
 		}
 
 
-		return amount;
+		return totalReadAmount;
 		
 	}
 
@@ -208,23 +211,29 @@ public class UserProcess {
 		Lib.assertTrue(offset >= 0 && length >= 0
 				&& offset + length <= data.length);
 
-		//UserKernel.lock.acquire();
+		UserKernel.lock.acquire();
 		byte[] memory = Machine.processor().getMemory();
 
 		// for now, just assume that virtual addresses equal physical addresses
 		//if (vaddr < 0 || vaddr >= memory.length)
 		//	return 0;
 
-		if(length <= 0)
+		if(length <= 0){
+			UserKernel.lock.release();
 			return 0;
+		}
 
 		int pageID = Processor.pageFromAddress(vaddr);
-		if(pageID >= numPages)
+		if(pageID >= numPages){
+			UserKernel.lock.release();
 			return 0;
+		}
 
 		TranslationEntry tmp = pageTable[pageID];
-		if(tmp.readOnly || !tmp.valid)
+		if(tmp.readOnly || !tmp.valid){
+			UserKernel.lock.release();
 			return 0;
+		}
 
 		int pageOffset = Processor.offsetFromAddress(vaddr);
 		int paddr = tmp.ppn*Processor.pageSize + pageOffset;
@@ -236,15 +245,19 @@ public class UserProcess {
 
 		int amount = Math.min(length, byteLeft);
 		//System.out.println("length is: " + length);
-		if(amount == length)
+		totalWriteAmount += amount;
+		if(amount == length){
 			System.arraycopy(data, offset, memory, paddr, amount);
+			UserKernel.lock.release();
+		}
 		else{
 			System.arraycopy(data, offset, memory, paddr, amount);
+			UserKernel.lock.release();
 			writeVirtualMemory(vaddr+amount, data, offset+amount, length-amount);
 		}
-		//UserKernel.lock.release();
+		
 
-		return amount;
+		return totalWriteAmount;
 	}
 
 	/**
@@ -381,20 +394,6 @@ public class UserProcess {
 			for (int i = 0; i < section.getLength(); i++) {
 				int vpn = section.getFirstVPN() + i;
 				
-				/*UserKernel.lock.acquire();
-				for(int j = 0; j < numPages; j++){
-					if(!pageTable[j].used){
-						//System.out.println("vpn is: " + vpn);
-						pageTable[j].vpn = vpn;
-						pageTable[j].readOnly = section.isReadOnly();
-						pageTable[j].used = true;
-						pageTable[j].ppn = UserKernel.freePhysicalPages.removeLast();
-						//System.out.println("ppn is: " + pageTable[j].ppn);
-						
-						break;
-					}
-				}
-				UserKernel.lock.release();*/
 				pageTable[vpn].used = true;
 				pageTable[vpn].readOnly = section.isReadOnly();
 				section.loadPage(i, pageTable[vpn].ppn);
@@ -620,9 +619,9 @@ public class UserProcess {
 		UserProcess child = null;
 
 		for(int i = 0; i < childProcess.size(); i++){
-			System.out.println("child processID is: " + childProcess.get(i).processID);
+			//System.out.println("child processID is: " + childProcess.get(i).processID);
 			if(childProcess.get(i).processID == processID){
-				System.out.println("processID is: " + processID);
+			//	System.out.println("processID is: " + processID);
 				child = childProcess.get(i);
 				//while(child.status != 0) {;}
 				//UserKernel.processLock.acquire();
@@ -633,9 +632,15 @@ public class UserProcess {
 
 		if(child == null || child.cT == null)
 			return -1;
-		UserKernel.processLock.acquire();
+		//UserKernel.processLock.acquire();
 		child.cT.join();
-		UserKernel.processLock.release();
+		//UserKernel.processLock.release();
+
+		byte[] tmp = new byte[4];
+		//System.out.println("child's status is: " + child.status);
+		Lib.bytesFromInt(tmp, 0, child.status);
+		writeVirtualMemory(status, tmp);
+
 		if(child.good != true)
 			return 0;
 
@@ -652,7 +657,7 @@ public class UserProcess {
 
 		//System.out.println("fileName: " + fileName);	
 
-		if(!fileName.contains(".coff"))
+		if(!fileName.contains(".coff") || fileName == null)
 			return -1;
 
 
@@ -737,6 +742,7 @@ public class UserProcess {
 			return -1;
 
 		int check = writeVirtualMemory(bva, bufferBytes, 0, count);
+		totalWriteAmount = 0;
 		if(check == 0)
 			return -1;
 
@@ -759,6 +765,7 @@ public class UserProcess {
 		byte[] bufferBytes = new byte[count];
 		int numberBytes = readVirtualMemory(bva, bufferBytes, 0, count);
 	//System.out.println("number bytes is: " + numberBytes);
+		totalReadAmount = 0;
 
 	//System.out.println("count is: " + count);
 		if(numberBytes == 0 && count != 0)
@@ -766,8 +773,9 @@ public class UserProcess {
 
 		if(numberBytes != count)
 			return -1;
+		
 		int check = writeFile.write(bufferBytes, 0, count);
-
+		
 	//System.out.println("check is: " + check);
 		if(check == -1)
 			return -1;
@@ -854,4 +862,6 @@ public class UserProcess {
 	public boolean good = false;
 	public int status = -1;
 	public KThread cT;
+	public int totalReadAmount = 0;
+	public int totalWriteAmount = 0;
 }
